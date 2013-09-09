@@ -9,6 +9,8 @@ use CE::PumpInterface;
 use AnyEvent::CouchDB;
 use Try::Tiny;
 use DateTime;
+use Switch;
+
 use Data::Dumper;
 
 #The it's probably best to encapsulate the couch/Biopay interface code
@@ -135,13 +137,18 @@ sub run {
 			}
 
 			my $pricePerLiter = sprintf("%.4f", $pumpData->{cost} / $pumpData->{vol});
-			$ret = $self->_pushTXN({
+			my $data_hash = {
 					member_id => $id,
 					vol => $pumpData->{vol},
-					priceFromDispsr => $pricePerLiter,
+					#priceFromDispsr => $pricePerLiter,
+					price_per_litre_diesel => 1,
+					price_per_litre_biodiesel => 2,
 					total_price => $pumpData->{cost},
-					#product_type => $type
-					});
+					product_type => $type
+			};
+			_mixToLitres($data_hash);
+
+			$ret = $self->_pushTXN($data_hash);
 			#TODO: this probably means something serious is wrong, not "next" probably!
 			next if $ret;
 
@@ -219,8 +226,13 @@ sub _pushTXN {
 		member_id => $args->{member_id},
 		epoch_time => $dt->epoch,
 		litres => $args->{vol},
+		litres_diesel => $args->{vol_diesel},
+		litres_biodiesel => $args->{vol_biodiesel},
+		price_per_litre_diesel => $args->{ppl_diesel},
+		price_per_litre_biodiesel => $args->{ppl_biodiesel},
+		mix => $args->{product_type},
 		date => "$dt",
-		price_per_litre => $args->{priceFromDispsr},
+		#price_per_litre => $args->{priceFromDispsr},
 		price => $args->{total_price},
 		paid => 0,
 		pump => $self->{loc}
@@ -256,6 +268,32 @@ sub _idle {
 
 	$self->{UI}->message("Press Enter");
 	return $self->{UI}->waitForStart();
+}
+
+#there maybe some round off errors cuz these are calculated..
+#diesel vol = total vol * mix ratio ('0.02f')
+#biodiesel_vol = total vol - diesel vol
+sub _mixToLitres {
+	my $txn_hash = shift;
+	my $vol = $txn_hash->{vol};
+	switch ( $txn_hash->{product_type} ) {
+		case 'Diesel' {
+			$txn_hash->{vol_diesel} = $vol;
+		}
+		case 'B25' {
+			$txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.75));
+		}
+		case 'B50' {
+			$txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.5));
+		}
+		case 'B100' {
+			return '0.0';
+		}
+		else {
+			die "Undefined product type: $txn_hash->{product_type}.";
+		}
+	}
+	$txn_hash->{vol_biodiesel} = $vol - $txn_hash->{vol_diesel};
 }
 
 1;
