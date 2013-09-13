@@ -235,6 +235,7 @@ sub _pushTXN {
 		#price_per_litre => $args->{priceFromDispsr},
 		price => $args->{total_price},
 		paid => 0,
+		tax_area => 'Victoria',
 		pump => $self->{loc}
 	};
 
