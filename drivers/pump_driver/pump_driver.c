@@ -10,6 +10,7 @@
 
 #include <linux/slab.h>  	// kmalloc  kfree 
 
+#include "pump_driver_util.h"
 #include "pump_driver.h"  
 
 
@@ -21,7 +22,7 @@ struct mmap_info {
 };
 
 static irq_user_info *myUsrData;
-static int clockPin_irq_number;
+static int latchPin_irq_number;
 
 //static unsigned char opened = 0;
 
@@ -48,34 +49,73 @@ static const struct file_operations my_fops = {
 #define CLK_CNT_INCR(x)	( x->clkCount = (x->clkCount + 1) & 0x0003ff )	// wraps at 1023
 
 unsigned long flags;
-unsigned char restored = 0;
+volatile unsigned long cpuCount;
+unsigned char restored = 1;
+
+/*
+static void test(void) {
+	volatile uint32_t c1, c2, c3, c4;
+	printk(KERN_ERR "TEST: 0\n");
+	c1 = st_cnt_read(); c2 = c1;
+//	printk(KERN_ERR "cnt: %u, cpu cnt: %u\n", c1, pmc_ccnt_read());
+//	while ( (c2 - c1) < 10 ) {
+		c3 = pmc_ccnt_read();
+		delayCycles(46);
+		//setPinPUD(LATCH_PIN, GPIO_PUD_PU);
+		c4 = pmc_ccnt_read();
+		c2 = st_cnt_read();
+		printk(KERN_ERR "delay: %u, cpu: %u\n", (c2 - c1), (c4 - c3));
+//	}
+}
+*/
 
 static irqreturn_t gpio_rising_interrupt(int irq, void* dev_id) {
 
-	unsigned char dd = __gpio_get_value(DATA_PIN);
-	int nc, oc = 0;
-
+	volatile uint32_t c1, c2;
+	uint16_t clkCount;
+	uint8_t oldClk, newClk, bail, i;
+	bail = 0;
+/*
+	volatile uint32_t c3, c4;
+*/
 	if ( myUsrData ) {
 
-		if ( irq == clockPin_irq_number ) {
+		if ( irq == latchPin_irq_number ) {
 			local_irq_save(flags);
 			restored = 0;
 
-			myUsrData->begin = myUsrData->clkCount;
-			myUsrData->dataBuffer[ myUsrData->clkCount ] = dd;	//__gpio_get_value(DATA_PIN);
-			CLK_CNT_INCR(myUsrData);
-			
-			while ( ! gpio_get_value(LATCH_PIN) ) {
-				nc = gpio_get_value(CLOCK_PIN);
-				if ( (nc == 1) && (oc == 0) ) {
-					myUsrData->dataBuffer[ myUsrData->clkCount ] = gpio_get_value(DATA_PIN);
-					CLK_CNT_INCR(myUsrData);
+			//printk(KERN_ERR "ISR: 0\n");
+			c1 = st_cnt_read(); c2 = c1;
+			//printk(KERN_ERR "cnt: %u\n", c1);
+			while ( (c2 - c1) < 300 ) {
+				c2 = st_cnt_read();
+				if ( ! __gpio_get_value(LATCH_PIN) ) {
+					printk(KERN_ERR "Pump driver: width %u\n", c2 - c1);
+					bail = 1;
+					break;
 				}
-				oc = nc;
 			}
-			myUsrData->latchCount++;
-			myUsrData->end = myUsrData->clkCount;
 
+			//we got a clean load pulse, clock in data
+			clkCount = myUsrData->clkCount;
+			if ( !bail ) {
+				newClk = 0;
+				for (i = 0; i < 96; i++) {
+					do {
+						oldClk = newClk;
+						newClk = __gpio_get_value(CLOCK_PIN);
+					} while ( oldClk || (!newClk) );
+					//on rising edge of clock
+					myUsrData->dataBuffer[ myUsrData->clkCount ] = __gpio_get_value(DATA_PIN);
+					CLK_CNT_INCR(myUsrData);
+
+				}
+				myUsrData->begin = clkCount;
+				myUsrData->latchCount++;
+				myUsrData->end = myUsrData->clkCount;
+			}
+
+			//bail!
 			local_irq_restore(flags);
 			restored = 1;
 		}
@@ -91,6 +131,11 @@ static int __init mymodule_init(void) {
 
 	//myUsrData = 0;
 	int ret;
+	cpuCount = 0;
+
+	printk("Pump driver: enabling PMCR\n");
+/*	asm volatile("mcr   p15, 0, %0, c15, c9, 0" : : "r"(1));*/
+	armv6_pmcr_write(ARMV6_PMCR_ENABLE);
 
 	// create the debugfs file used to communicate buffer address to user space
 	vfs_fd = debugfs_create_file(MAPPED_BUFFER_FILENAME, 0644, NULL, NULL, &my_fops);
@@ -120,6 +165,9 @@ static int __init mymodule_init(void) {
 		printk(KERN_ERR "Pump driver: direction failed\n");
 		goto relAllPins;
 	}
+
+	setPinPUD(LATCH_PIN, GPIO_PUD_PD);
+	printk("Pump driver: GPIO PD enabled\n");
 /*
 	if ( gpio_set_debounce(LATCH_PIN, 0) || gpio_set_debounce(CLOCK_PIN, 0) ) {
 		gpio_free(LATCH_PIN); gpio_free(CLOCK_PIN); gpio_free(DATA_PIN);
@@ -127,16 +175,16 @@ static int __init mymodule_init(void) {
 		return -EIO;
 	}
 */
-	clockPin_irq_number = gpio_to_irq(CLOCK_PIN);
+	latchPin_irq_number = gpio_to_irq(LATCH_PIN);
 
 
-	if ( request_irq(clockPin_irq_number, gpio_rising_interrupt, 
+	if ( request_irq(latchPin_irq_number, gpio_rising_interrupt, 
 				IRQF_TRIGGER_RISING, "pump_driver_clk_rising", NULL) ) {
-		printk(KERN_ERR "Pump driver: trouble requesting IRQ %d", clockPin_irq_number);
+		printk(KERN_ERR "Pump driver: trouble requesting IRQ %d", latchPin_irq_number);
 		goto relAllPins;
 	}
 
-	disable_irq(clockPin_irq_number);
+	disable_irq(latchPin_irq_number);
 
 	printk("Pump driver: init successful\n");
 	return 0;
@@ -159,19 +207,30 @@ static void __exit mymodule_exit(void) {
 
 	//clean up
 	debugfs_remove(vfs_fd);
+	printk("Pump driver: removed SMF\n");
+
+	setPinPUD(LATCH_PIN, GPIO_PUD_DISABLE);
+	printk("Pump driver: GPIO PUD disabled\n");
 
 	gpio_free(LATCH_PIN);
 	gpio_free(CLOCK_PIN);
 	gpio_free(DATA_PIN);
+	printk("Pump driver: freed GPIOs\n");
 
-
-	free_irq(clockPin_irq_number, NULL);
+	free_irq(latchPin_irq_number, NULL);
+	printk("Pump driver: released IRQ\n");
 
 	if ( ! restored ) {
+		printk("Pump driver: had to restore flags\n");
 		local_irq_restore(flags);
+		printk("Pump driver: restored flags\n");
 	}
 
-	printk ("Pump driver: gpio_reset module unloaded\n");
+	printk("Pump driver: disabling PMCR\n");
+/*	asm volatile("mcr   p15, 0, %0, c15, c9, 0" : : "r"(0));*/
+	armv6_pmcr_write(ARMV6_PMCR_DISABLE);
+
+	printk ("Pump driver: module unloaded\n");
 	return;
 }
 
@@ -259,7 +318,7 @@ static int fops_close(struct inode *inode, struct file *filp)
 	if ( ! restored ) {
 		local_irq_restore(flags);
 	}
-	disable_irq(clockPin_irq_number);
+	disable_irq(latchPin_irq_number);
 
 	//opened = 0;
 
@@ -304,7 +363,7 @@ static int fops_open(struct inode *inode, struct file *filp)
 		return -1;
 	}
 
-	enable_irq(clockPin_irq_number);
+	enable_irq(latchPin_irq_number);
 
 	myUsrData->clkCount = 0;
 	myUsrData->begin = 0;

@@ -224,6 +224,7 @@ int myInit() {
 	}
 	pagesize = sysconf(_SC_PAGESIZE);
 	fd = 0;
+	SS_to_Char[0b0000000] = '0';    //blank is treated as zero in calculations
 	SS_to_Char[0b0111111] = '0';
 	SS_to_Char[0b0000110] = '1';
 	SS_to_Char[0b1011011] = '2';
@@ -411,7 +412,7 @@ int releaseDriverBuffer() {
 
 int myIntercept(int nozInd, HV *retHash) {
 
-	int i, j, k, clockedIn, b, oldLatch;
+	int i, j, k, clockedIn, b, oldLatch, errCode = 0;
 	unsigned long volCoeff, costCoeff, cost, vol;	//need to fit up to 1000000 in these
 	uint8_t tmpSS, nozzleReplacedFlag = 0;
 	volatile irq_user_info *buf = getDriverBuffer();
@@ -439,7 +440,8 @@ int myIntercept(int nozInd, HV *retHash) {
 			clockedIn = ( b < buf->end ) ? 
 				(buf->end - b) : (1024 - b + buf->end);
 			if ( clockedIn < E_B_L ) {		//probably missed some pulses
-				fprintf(stderr, "Only got %d clock edges, skipping\n", clockedIn);
+				errCode = -1;
+				fprintf(stderr, "Only got %d clock edge(s), skipping\n", clockedIn);
 			}
 			else {
 				//only last 96 bits are of interest
@@ -448,7 +450,7 @@ int myIntercept(int nozInd, HV *retHash) {
 				for (j = 0; j < 12; j++ ) {
 					tmpSS = 0;
 					for (k = 0; k < 8; k++) {
-						//bits are clocked in last first, hence shift by k
+						//bits are clocked in LSB first, hence shift by k
 						tmpSS += ( ( buf->dataBuffer[ (b + ( (j * 8) + k ) ) & 0x0003ff ] ) << k );
 					}
 					//bytes are clocked in last first, hence "11 - j"
@@ -470,13 +472,17 @@ int myIntercept(int nozInd, HV *retHash) {
 					volCoeff *= 10;
 				}
 				fprintf(stderr, "$%4.2f\n%3.3fL\n", (float)cost / 100, (float)vol / 1000);
+				errCode = 0;
 			}
 			oldLatch = buf->latchCount;
-		}
+//		}
 
 		//hmm...this does the right thing with regard to reference counts and stuff doesn't it??
 		hv_stores(retHash, "cost", newSVuv(cost));
 		hv_stores(retHash, "vol", newSVuv(vol));
+		if ( errCode == -1 ) {
+			hv_stores(retHash, "err", newSVpv("missedClock", 11));
+		}
 	}
 	else {
 		fprintf(stderr, "Error reading the data\n");

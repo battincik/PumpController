@@ -1,7 +1,10 @@
+#ifndef __PUMP_DRIVER_CORE__
+#define __PUMP_DRIVER_CORE__
 
-#define	CLOCK_PIN	17		// P1.11 <-> gpio 17
-#define	DATA_PIN	22		// P1.15 <-> gpio 22
-#define	LATCH_PIN	23		// P1.16 <-> gpio 23
+// wiringPi pin numbers are like Arduino....
+#define	CLOCK_PIN	17		// gpio 17
+#define	DATA_PIN	22		// gpio 22
+#define	LATCH_PIN	23		// gpio 23
 
 #define E_B_L		96		//expected bits per latch
 #define FIX_A_SEG_IF_POSSIBLE 1		//Sometimes control is passed to the ISR a bit late
@@ -25,3 +28,4 @@ typedef struct irq_user_info {
 	unsigned short latchCount;
 } irq_user_info;
 
+#endif
