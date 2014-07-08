@@ -13,11 +13,6 @@ use Switch;
 
 use Data::Dumper;
 
-#The it's probably best to encapsulate the couch/Biopay interface code
-#into its own thing.
-#Though within Biopay project itself, pushing txns is done in the code 
-#in a similar way. A modular txn class or something is not used.
-
 sub new {
 	my $class = shift;
 
@@ -47,20 +42,24 @@ sub run {
 	my $checkedOut = 0;
 	my ($id, $p, $num, $vol, $bail); $bail = 0;
 
-	while ( ( $bail == 0 ) && ( $self->_idle() ) ) {
+	while ( $self->_idle() ) {
 
 		$num = $UI->promptFeedback("User ID + Enter", \@resp, 7, 'fb');
 		if ($num == $UI->timeoutError) {
 			$UI->message("Timeout");
-			sleep(3);
-			next;
+			sleep(6);
+			$bail = 1;
 		}
+		goto BAIL if ( $bail == 1);
+
 		$id = join('', @resp[0..($num - 1)]);
 		my $docID = "member:$id";
 
-		my $doc;
+		my ($doc, $prices);
 		try {
 			$doc = $couch->open_doc($docID)->recv();
+			$prices = $self->_getPricePerLiter();
+			warn "prices acquired.";
 		}
 		catch {		
 			#check the error message here. This could also happen due to DB connection failure..
@@ -72,85 +71,102 @@ sub run {
 			else {
 				$UI->message("No DB connection");
 			}
-			sleep(3);
-			next;
+			sleep(6);
+			$bail = 1;
 		};
+		goto BAIL if ( $bail == 1);
 
 		if ( $doc->{member_id} == $id ) {
 			if ( (defined $doc->{frozen}) and ($doc->{frozen} == 1) ) {
 				$UI->message("Account frozen");
 				sleep(3);
-				next;
+				$bail = 1;
 			}
+			goto BAIL if ( $bail == 1);
+
 
 			$num = $UI->promptFeedback("PIN + Enter", \@resp, 4, 'scramble');
 			if ($num == $UI->timeoutError) {
 				$UI->message("Timeout");
-				sleep(3);
-				next;
+				sleep(6);
+				$bail = 1;
 			}
+			goto BAIL if ( $bail == 1);
+
 			$p = join('', @resp[0..($num - 1)]);
 			unless ( $p == $doc->{PIN} ) {
 				$UI->message("Invalid PIN");
-				sleep(3);
-				next;
+				sleep(6);
+				$bail = 1;
 			}
+			goto BAIL if ( $bail == 1);
+
 			
-			$UI->message("Checked out");
-			sleep(1);
-
-			$UI->message("Select type");
-			my $type = $PI->waitForType();
-			if ($type eq $PI->timeoutError) {
-				$UI->message("Timeout");
-				sleep(3);
-				next;
-			}
-			$UI->message("$type selected");
+			$UI->message("PIN OK!");
 			sleep(3);
-			$UI->message("remove nozzle");
 
-			my $nozzle = ($type eq "Diesel") ? "Diesel" : "BioDiesel";
+			$UI->message("Remove nozzle", "and select type");
 			my $ret;
-			$ret = $PI->waitForNozzleRemoval($nozzle);
+
+			$ret = $PI->waitForType();
 			if ($ret eq $PI->timeoutError) {
 				$UI->message("Timeout");
-				sleep(3);
-				next;
+				sleep(6);
+				$bail = 1;
 			}
+			goto BAIL if ( $bail == 1);
 
-			$UI->message("begin fueling");
-			sleep(1);
+			my $type = $ret;
+
+			$ret = $PI->waitForNozzleRemoval();
+			warn "waitForNozzle returned $ret.";
+			if ($ret eq $PI->timeoutError) {
+				$UI->message("Timeout");
+				sleep(6);
+				$bail = 1;
+			}
+			goto BAIL if ( $bail == 1);
+
+			my $nozzle = $ret;
 
 			$PI->enablePumps();
+
+			$UI->message("$type selected");
+			$UI->message("Begin fueling");
+			# sleep(2);
+
+
 			my $pumpData = $PI->intercept($nozzle);
 			$PI->disablePumps();
 			#gotta take out the taxes and stuff
 
 			if ( not defined $pumpData->{vol} ) {
 				warn "Pump data was invalid.";
-				next;
+				$bail = 1;
 			}
+			goto BAIL if ( $bail == 1);
+
 			if ($pumpData->{vol} == 0) {
 				warn "Session ended without any fuel being dispensed.";
-				next;
+				$bail = 1;
 			}
+			goto BAIL if ( $bail == 1);
+
 
 			my $pricePerLiter = sprintf("%.4f", $pumpData->{cost} / $pumpData->{vol});
 			my $data_hash = {
 					member_id => $id,
 					vol => $pumpData->{vol},
-					#priceFromDispsr => $pricePerLiter,
-					price_per_litre_diesel => 1,
-					price_per_litre_biodiesel => 2,
+					##priceFromDispsr => $pricePerLiter,
 					total_price => $pumpData->{cost},
 					product_type => $type
-			};
-			_mixToLitres($data_hash);
+					};
+			_mixToLitres($data_hash, $prices);
 
 			$ret = $self->_pushTXN($data_hash);
 			#TODO: this probably means something serious is wrong, not "next" probably!
-			next if $ret;
+			print "_pushTXN returned $ret.\n";
+			goto BAIL if $ret;
 
 			#$num = $UI->promptFeedback("Volume (e.g. 13)", \@resp, 3, 'fb');
 			#if ($num == $UI->timeoutError) {
@@ -162,7 +178,7 @@ sub run {
 
 
 			$UI->message("$pumpData->{vol}".'L$'."$pumpData->{cost}");
-			sleep(3);
+			sleep(6);
 			$pumpData = undef;
 		
 		}
@@ -175,6 +191,8 @@ sub run {
 		#$num = $UI->promptFeedback("PIN + Enter", \@resp, 4, 'scramble');
 		#$p = join('', @resp[0..($num - 1)]);
 		#$checkedOut = authenticate($p);
+
+		BAIL: $bail = 0;
 	}
 
 	$PI->destroy();
@@ -275,26 +293,54 @@ sub _idle {
 #diesel vol = total vol * mix ratio ('0.02f')
 #biodiesel_vol = total vol - diesel vol
 sub _mixToLitres {
-	my $txn_hash = shift;
-	my $vol = $txn_hash->{vol};
-	switch ( $txn_hash->{product_type} ) {
-		case 'Diesel' {
-			$txn_hash->{vol_diesel} = $vol;
-		}
-		case 'B25' {
-			$txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.75));
-		}
-		case 'B50' {
-			$txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.5));
-		}
-		case 'B100' {
-			return '0.0';
-		}
-		else {
-			die "Undefined product type: $txn_hash->{product_type}.";
-		}
-	}
-	$txn_hash->{vol_biodiesel} = $vol - $txn_hash->{vol_diesel};
+        my $txn_hash = shift;
+	my $prices = shift;
+
+        my $vol = $txn_hash->{vol};
+        switch ( $txn_hash->{product_type} ) {
+                case 'Diesel' {
+                        $txn_hash->{vol_diesel} = $vol;
+                }
+                case 'B20' {
+                        $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.75));
+                }
+                case 'B50' {
+                        $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.5));
+                }
+                case 'B100' {
+                        $txn_hash->{vol_diesel} = '0.0';
+                }
+                else {
+                        die "Undefined product type: $txn_hash->{product_type}.";
+                }
+        }
+
+        $txn_hash->{vol_biodiesel} = $vol - $txn_hash->{vol_diesel};
+	$txn_hash->{ppl_diesel} = $prices->{ppl_diesel};
+	$txn_hash->{ppl_biodiesel} = $prices->{ppl_biodiesel};
+	$txn_hash->{total_price} = 
+		( $txn_hash->{vol_biodiesel} * $txn_hash->{ppl_biodiesel}) +
+		($txn_hash->{vol_diesel} * $txn_hash->{ppl_diesel});
+
+	print "Mix: $txn_hash->{product_type}.\n";
+	print "ppl_d: $txn_hash->{ppl_diesel}, ppl_bd: $txn_hash->{ppl_biodiesel}.\n";
+	print "vol_d: $txn_hash->{vol_diesel}, vol_bd: $txn_hash->{vol_biodiesel}.\n";
+	print "total: $txn_hash->{total_price}.\n";
+
+	$txn_hash->{total_price} = sprintf("%.2f", $txn_hash->{total_price} );
+
+}
+
+sub _getPricePerLiter {
+	my $self = shift;
+
+	my $couch = $self->{couch};
+	my $doc = $couch->open_doc("prices")->recv();
+
+	my $ret = { ppl_diesel => $doc->{price_per_litre_diesel},
+		ppl_biodiesel => $doc->{price_per_litre_biodiesel}};
+
+	return $ret;
 }
 
 1;

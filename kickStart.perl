@@ -59,7 +59,7 @@ $SIG{INT} = \&_sigHandler;
 
 warn "terms: $term\n";
 
-my $PH = CE::PumpHandler->new('http://127.0.0.1:5984/testdb', 'KinsolOffice_hacking', $term);
+my $PH = CE::PumpHandler->new('http://127.0.0.1:5984/testdb', 'Duncan', $term);
 $PH->run;
 
 

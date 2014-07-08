@@ -116,6 +116,14 @@ sub clearLine {
 	$scr->setCursor(0, $y - 1);
 }
 
+sub setBacklight {
+	my $self = shift;
+
+	my $color = shift;
+	$self->{_scr}->backlight($color);
+
+}
+
 sub clearScr {
 	my $self = shift;
 

@@ -17,7 +17,8 @@ BEGIN {
 #use Device::BCM2835 qw( HIGH LOW );
 
 my %reqAttr = (
-	TO => 10,	#timeout in seconds
+	TO => 30,	#timeout in seconds
+	blinkingPeriod => 3
 );	
 
 #see P[1234]_PIN
@@ -26,9 +27,9 @@ my %reqAttr = (
 my @products = qw(Diesel B20 B50 B100);
 
 #see NOZZLE[12]_PIN
-#              Nozzle1       Nozzle2
-#		PIN4         PIN5
-my @nozzles = qw(Diesel BioDiesel);
+#              Nozzle1      Nozzle2
+#		PIN5         PIN4
+my @nozzles = qw(BioDiesel Diesel);
 
 sub timeoutError { return '-1'; }
 
@@ -50,6 +51,7 @@ sub new {
 
 #	Device::BCM2835::gpio_fsel($self->{'PEPin'},
 #				&Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
+	disablePumps();
 
 	return bless($self, $class);
 }
@@ -58,7 +60,7 @@ sub enablePumps {
 	my $self = shift;
 
 #	Device::BCM2835::gpio_write($self->{PEPin}, HIGH);
-	myEnablePumps();
+	myActivateRels();
 
 	return $self;
 }
@@ -67,7 +69,7 @@ sub disablePumps {
 	my $self = shift;
 
 #	Device::BCM2835::gpio_write($self->{PEPin}, LOW);
-	myDisablePumps();
+	myDeactivateRels();
 
 	return $self;
 }
@@ -87,7 +89,7 @@ sub disablePumps {
 sub intercept {
 	my $self = shift;
 	my $correctNozzle = shift;
-	#return {cost => 123.34, vol => 14.908};
+#	return {cost => 123.34, vol => 14.908};
 
 	my ($ind) = grep { $nozzles[$_] eq $correctNozzle } 0..$#nozzles;
 	die "undefined nozzle" unless defined $ind;
@@ -116,17 +118,34 @@ sub monitorRelBrdInputs {
 sub waitForType {
 	my $self = shift;
 
-	my $t1 = time();		#epoch in secs
-	my $t2 = $t1;
+	my $to_start = time();		#epoch in secs
+	my ($now, $lastBlink) = ($to_start, $to_start);
 
-	my $type;
-	while ( ($t2 - $t1) < $self->{TO} ) {
+	my ($type, $prev_type) = (-1, -1);
+	while ( 1 ) {
+		if ( ($now - $to_start) > $self->{TO} ) {
+			warn "waitForType() timed out";
+			return timeoutError();
+		}
+
 		$type = myTypeSelected();
-		return $products[$type] if $type >= 0;
-		$t2 = time();
+		if ($type >= 0) {
+			if ( ($now - $lastBlink) > $self->{blinkingPeriod} ) {
+				return $products[$type];
+			}
+			if ($type != $prev_type) {
+				$lastBlink = $now;
+			}
+		}
+		else {
+			$lastBlink =$now;
+		}
+		$prev_type = $type;
+
+		$now = time();
 	}
 
-	warn "waitForType() timed out";
+	warn "waitForType(): this should not happen!";
 	return timeoutError();
 }
 
@@ -134,7 +153,6 @@ sub waitForNozzleRemoval {
 	warn "waiting for nozzle to be removed";
 
 	my $self = shift;
-	my $correctNozzle = shift;
 
 	my $t1 = time();		#epoch in secs
 	my $t2 = $t1;
@@ -142,8 +160,8 @@ sub waitForNozzleRemoval {
 	my $noz;
 	while ( ($t2 - $t1) < $self->{TO} ) {
 		$noz = myNozzleRemoved();
-		return "yes" if ( ($noz >= 0) && ($nozzles[$noz] eq $correctNozzle) );
-		#warn "noz: $noz, correct: $correctNozzle, returned: $nozzles[$noz]";
+		warn "noz: $noz, returned: $nozzles[$noz]";
+		return $nozzles[$noz] if ($noz >= 0);
 		$t2 = time();
 	}
 
@@ -169,6 +187,8 @@ sub bothNozzlesReplaced {
 
 sub destroy {
 	my $self = shift;
+
+	enablePumps();
 
 	myDestroy();
 }
@@ -234,14 +254,16 @@ int myInit() {
 	SS_to_Char[0b1111101] = '6';
 	SS_to_Char[0b0000111] = '7';
 	SS_to_Char[0b1111111] = '8';
-	SS_to_Char[0b1101111] = '9';
+	//SS_to_Char[0b1101111] = '9';
+
+	SS_to_Char[0b1100111] = '9';
 
 #ifdef FIX_A_SEG_IF_POSSIBLE
 	//SS_to_Char[0b0111111] = '0'; //not needed, decoded correctly
 	//SS_to_Char[0b0000111] = '1'; //can't fix this one, turns into '7' :|
 	//SS_to_Char[0b1011011] = '2'; //not needed, decoded correctly
 	//SS_to_Char[0b1001111] = '3'; //not needed, decoded correctly
-	SS_to_Char[0b1100111] = '4';
+	//SS_to_Char[0b1100111] = '4'; //
 	SS_to_Char[0b1101100] = '5';
 	SS_to_Char[0b1111100] = '6';
 	//SS_to_Char[0b0000111] = '7'; //not needed, decoded correctly
@@ -274,7 +296,7 @@ int myInit() {
 	return 0;
 }
 
-int myEnablePumps() {
+int myDeactivateRels() {
 	uint8_t new_output_reg, old_output_reg, output_bit_mask;
 	
 	old_output_reg = pfio_read_output();
@@ -287,7 +309,7 @@ int myEnablePumps() {
 	pfio_write_output(new_output_reg);
 }
 
-int myDisablePumps() {
+int myActivateRels() {
 	uint8_t new_output_reg, old_output_reg, output_bit_mask;
 	
 	old_output_reg = pfio_read_output();
@@ -339,16 +361,16 @@ int myTypeSelected() {
 	//(level will be low when the button is depressed)
 
 	input_reg &= _productsMask;	//Grrr switch is not allowed without compile time constant case lables..
-	if (input_reg == _p1Mask) {		
+	if ( (input_reg & _p1Mask) == 0) {		
 		return P1_PIN;
 	}
-	else if (input_reg == _p2Mask ) {
+	else if ( (input_reg & _p2Mask) == 0 ) {
 		return P2_PIN;
 	}
-	else if (input_reg == _p3Mask) {
+	else if ( (input_reg & _p3Mask) == 0) {
 		return P3_PIN;
 	}
-	else if (input_reg == _p4Mask) {
+	else if ( (input_reg & _p4Mask) == 0) {
 		return P4_PIN;
 	}
 	else {
@@ -410,11 +432,24 @@ int releaseDriverBuffer() {
 	return 0;
 }
 
+uint8_t isSteady(unsigned long arr[], uint8_t ind, unsigned long v) {
+	uint8_t i;
+	for (i = 0; i < ind; i++) {
+		if (arr[i] != v) {
+			return 0;
+		}
+	}
+	arr[ind] = v;
+	return (ind + 1);
+}
+
 int myIntercept(int nozInd, HV *retHash) {
 
 	int i, j, k, clockedIn, b, oldLatch, errCode = 0;
 	unsigned long volCoeff, costCoeff, cost, vol;	//need to fit up to 1000000 in these
-	uint8_t tmpSS, nozzleReplacedFlag = 0;
+	unsigned long old_vols[5];
+	uint8_t steady, tmpSS, nozzleReplacedFlag = 0;
+	
 	volatile irq_user_info *buf = getDriverBuffer();
 
 	fprintf(stderr, "nozInd: %d\n", nozInd);
@@ -423,12 +458,13 @@ int myIntercept(int nozInd, HV *retHash) {
 	if ( buf ) {
 		fprintf(stderr, "init\n");
 	
+		steady = 0;
 		oldLatch = buf->latchCount;
 		//for (i = 0; i < 10; i++)
-		while ( ! nozzleReplacedFlag ) {
+		while ( ! (nozzleReplacedFlag && (steady >= 5) ) ) {
 			nozzleReplacedFlag = myNozzleReplaced(nozInd);
 
-			fprintf(stderr, "%d, lacthcnt: %d\n", i, oldLatch);
+			fprintf(stderr, "%d, %d, %d, %d, lacthcnt: %d\n", steady, nozzleReplacedFlag, vol, i, oldLatch);
 
 			while (oldLatch == buf->latchCount) {
 				//sleep(1);
@@ -467,15 +503,22 @@ int myIntercept(int nozInd, HV *retHash) {
 					cost += digs[j] * costCoeff;
 					costCoeff *= 10;
 				}
-				for ( ; j < 12; j++) {		//digits 6-11 constitute the vol
+				for ( j = 6; j < 12; j++) {		//digits 6-11 constitute the vol
 					vol += digs[j] * volCoeff;
 					volCoeff *= 10;
 				}
 				fprintf(stderr, "$%4.2f\n%3.3fL\n", (float)cost / 100, (float)vol / 1000);
 				errCode = 0;
+				
+				//after nozzle is replaced, the vol should remain the same for
+				//some number of consecutive reads to make sure we get the valid final
+				//value
+				if ( nozzleReplacedFlag ) {
+					steady = isSteady(old_vols, steady, vol);
+				}
 			}
 			oldLatch = buf->latchCount;
-//		}
+		}
 
 		//hmm...this does the right thing with regard to reference counts and stuff doesn't it??
 		hv_stores(retHash, "cost", newSVuv(cost));

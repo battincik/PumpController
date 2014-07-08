@@ -1,13 +1,12 @@
 #ifndef __PUMP_DRIVER_CORE__
 #define __PUMP_DRIVER_CORE__
 
-// wiringPi pin numbers are like Arduino....
-#define	CLOCK_PIN	17		// gpio 17
-#define	DATA_PIN	22		// gpio 22
-#define	LATCH_PIN	23		// gpio 23
+#define	CLOCK_PIN	17		// P1.11 <-> gpio 17
+#define	DATA_PIN	22		// P1.15 <-> gpio 22
+#define	LATCH_PIN	23		// P1.16 <-> gpio 23
 
 #define E_B_L		96		//expected bits per latch
-#define FIX_A_SEG_IF_POSSIBLE 1		//Sometimes control is passed to the ISR a bit late
+// #define FIX_A_SEG_IF_POSSIBLE 1		//Sometimes control is passed to the ISR a bit late
 					//later than 3us past the first rising edge of the clock 
 					//which causes the sampled to actually be the same as the
 					//second bit. If it there some redundancy in the 7-seg

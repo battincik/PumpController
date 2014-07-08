@@ -34,7 +34,7 @@ sub new {
 		case 'LCD&realKP' {
 			die "provide SU" if ( CE::Keypad->getUID() );
 			$self->{scr} = CE::LCD->new();
-			$self->{kp} = CE::Keypad->new( ('dev' => '/dev/input/by-id/usb-Hagstrom_Electronics__Inc._Hagstrom_Electronics__Inc._KEUSB2-event-kbd', 'promptTO' => 5000) );
+			$self->{kp} = CE::Keypad->new( ('dev' => '/dev/input/by-id/usb-Hagstrom_Electronics__Inc._Hagstrom_Electronics__Inc._KEUSB2-event-kbd', 'promptTO' => 50000) );
 		}
 		else {
 			die "Wrong terminal options";
@@ -108,9 +108,16 @@ sub message {
 	my $self = shift;
 
 	my $str = shift;
+	my $str2 = shift;
 
 	$self->{scr}->clearScr();
-	$self->{scr}->putLine($str, 2);
+	if ( $str2 ) {
+		$self->{scr}->putLine($str, 1);
+		$self->{scr}->putLine($str2, 2);
+	}
+	else {
+		$self->{scr}->putLine($str, 2);
+	}
 
 	return 1;
 }
