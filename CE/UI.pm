@@ -128,7 +128,9 @@ sub waitForStart {
 
 	my $k = 0;
 #	$k = $self->{kp}->getChar() until ( ord($k) == 10 || $k eq $self->{kp}->getESC );
-	until ( ord($k) == 10 || $k eq $self->{kp}->getESC ) {
+	# until ( ord($k) == 10 || $k eq $self->{kp}->getESC ) {
+	# We don't want a shutdown button right now..
+	until ( ord($k) == 10 ) {
 		$k = $self->{kp}->getChar();
 		#warn "char |$k|\n";
 	}
