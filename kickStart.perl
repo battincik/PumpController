@@ -8,6 +8,8 @@ my ($opts, $term, $coldstartFlag);
 BEGIN {
 	require Getopt::Long;
 
+	print @ARGV;
+
 	Getopt::Long::GetOptions ("terms=s" => \$term, 
 			"coldstart" => \$coldstartFlag) 
 			|| die ("Bad command line arguments\n");
@@ -55,13 +57,22 @@ BEGIN {
 
 use CE::PumpHandler;
 
+sub cleanup {
+	print STDERR "Attempting to teminate gracefully\n";
+	print STDERR "Unloading pump_controller driver..\n";
+	`sudo rmmod pump_controller`;
+	print STDERR "Unmounting debugfs..\n";
+	`sudo umount /sys/kernel/debug/`;
+}
+
+
 $SIG{INT} = \&_sigHandler;
 
 warn "terms: $term\n";
 
 my $PH = CE::PumpHandler->new('http://127.0.0.1:5984/testdb', 'Duncan', $term);
 $PH->run;
-
+cleanup();
 
 
 sub _sigHandler {
@@ -73,4 +84,6 @@ sub _sigHandler {
 	#TODO put some message on the LCD and keep it on..
 	$PH->destroy();
 	die "pump handler destroyed";
+	cleanup();
 }
+
