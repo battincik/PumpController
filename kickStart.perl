@@ -59,8 +59,9 @@ use CE::PumpHandler;
 
 sub cleanup {
 	print STDERR "Attempting to teminate gracefully\n";
-	print STDERR "Unloading pump_controller driver..\n";
-	`sudo rmmod pump_controller`;
+	#TODO verify these steps were successful
+	print STDERR "Unloading pump_driver..\n";
+	`sudo rmmod pump_driver`;
 	print STDERR "Unmounting debugfs..\n";
 	`sudo umount /sys/kernel/debug/`;
 }
