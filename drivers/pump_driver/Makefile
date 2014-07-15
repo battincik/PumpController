@@ -4,7 +4,7 @@ KDIR=$(KERNEL_SRC)
 
 all: pump_driver
 
-pump_driver: pump_driver.c pump_driver.h
+pump_driver: pump_driver.c pump_driver.h pump_driver_util.h
 	make -C $(KDIR) ARCH=arm CROSS_COMPILE=$(CCPREFIX) M=$(PWD) modules
 
 clean:
