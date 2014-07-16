@@ -1,0 +1,38 @@
+Last updated: Aug 15, 2013 - SP
+
+Piface inputs:
+---------------
+P1 -> product 1 : Diesel
+P2 -> product 2 : B20
+P3 -> product 3 : B50
+P4 -> product 4 : B100
+
+Nozzle1 -> Diesel
+Nozzle2 -> BioDiesel
+
+
+Piface Relays:
+--------------
+In series with the pump relays.
+Normally open (disabled).
+
+Other Piface related stuff:
+-----------------------------
+There is a jumper next to relay one. It is tieing the pi supply line to piface supply.
+Inputs are pulled up to 3.3V VDD with a 100K resistor.
+There is an unknown currnet limiting resistor in series as well.
+
+thePi - intercepting dispenser LCD data:
+----------------------------------------
+P1.11 to Clock
+P1.15 to Data
+P1.16 to Latch
+
+P1 is the largest port on the pi.
+Pin 1 of the port is marked with a little bracket to its left.
+
+keypad
+------------------
+Usb encoder board connects to the keypad with a ribbon cable.
+I marked the header on the board with red ink. The red stripe goes on that side.
+There is a usb cable to connect the encoder board to the pi.
