@@ -177,8 +177,8 @@ sub run {
 			#$vol = join('', @resp[0..($num - 1)]);
 
 
-			$UI->message("$pumpData->{vol}".'L$'."$pumpData->{cost}");
-			sleep(6);
+			$UI->message("$pumpData->{vol}".'L', '$'."$data_hash->{total_price}");
+			sleep(24);
 			$pumpData = undef;
 		
 		}

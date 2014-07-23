@@ -68,7 +68,10 @@ static void test(void) {
 //	}
 }
 */
-
+/*
+char debugStr[97] = {0};
+*/
+ 
 static irqreturn_t gpio_rising_interrupt(int irq, void* dev_id) {
 
 	volatile uint32_t c1, c2;
@@ -84,13 +87,13 @@ static irqreturn_t gpio_rising_interrupt(int irq, void* dev_id) {
 			local_irq_save(flags);
 			restored = 0;
 
-			//printk(KERN_ERR "ISR: 0\n");
+			/* printk(KERN_ERR "ISR: 0\n"); */
 			c1 = st_cnt_read(); c2 = c1;
-			//printk(KERN_ERR "cnt: %u\n", c1);
+			/* printk(KERN_ERR "cnt: %u\n", c1); */
 			while ( (c2 - c1) < 300 ) {
 				c2 = st_cnt_read();
 				if ( ! __gpio_get_value(LATCH_PIN) ) {
-					printk(KERN_ERR "Pump driver: width %u\n", c2 - c1);
+					/* printk(KERN_ERR "Pump driver: width %u\n", c2 - c1); */
 					bail = 1;
 					break;
 				}
@@ -99,14 +102,16 @@ static irqreturn_t gpio_rising_interrupt(int irq, void* dev_id) {
 			//we got a clean load pulse, clock in data
 			clkCount = myUsrData->clkCount;
 			if ( !bail ) {
+				/* printk(KERN_ERR "Wide load: width %u\n", c2 - c1); */
 				newClk = 0;
 				for (i = 0; i < 96; i++) {
 					do {
 						oldClk = newClk;
 						newClk = __gpio_get_value(CLOCK_PIN);
-					} while ( oldClk || (!newClk) );
-					//on rising edge of clock
+					} while ( (!oldClk) || newClk );
+					//on falling edge of clock
 					myUsrData->dataBuffer[ myUsrData->clkCount ] = __gpio_get_value(DATA_PIN);
+					/* debugStr[i] = (char) 48 + myUsrData->dataBuffer[ myUsrData->clkCount ]; */
 					CLK_CNT_INCR(myUsrData);
 
 				}
@@ -114,6 +119,7 @@ static irqreturn_t gpio_rising_interrupt(int irq, void* dev_id) {
 				myUsrData->latchCount++;
 				myUsrData->end = myUsrData->clkCount;
 			}
+			/* printk(KERN_ERR "Finished clocking in %s.", debugStr); */
 
 			//bail!
 			local_irq_restore(flags);

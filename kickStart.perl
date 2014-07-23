@@ -58,7 +58,7 @@ BEGIN {
 use CE::PumpHandler;
 
 sub cleanup {
-	print STDERR "Attempting to teminate gracefully\n";
+	print STDERR "Attempting to terminate gracefully\n";
 	#TODO verify these steps were successful
 	print STDERR "Unloading pump_driver..\n";
 	`sudo rmmod pump_driver`;
@@ -84,7 +84,7 @@ sub _sigHandler {
 	#TODO make sure this was successful
 	#TODO put some message on the LCD and keep it on..
 	$PH->destroy();
-	die "pump handler destroyed";
 	cleanup();
+	die "pump handler destroyed";
 }
 
