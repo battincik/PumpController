@@ -57,15 +57,6 @@ BEGIN {
 
 use CE::PumpHandler;
 
-sub cleanup {
-	print STDERR "Attempting to terminate gracefully\n";
-	#TODO verify these steps were successful
-	print STDERR "Unloading pump_driver..\n";
-	`sudo rmmod pump_driver`;
-	print STDERR "Unmounting debugfs..\n";
-	`sudo umount /sys/kernel/debug/`;
-}
-
 
 $SIG{INT} = \&_sigHandler;
 
@@ -73,7 +64,6 @@ warn "terms: $term\n";
 
 my $PH = CE::PumpHandler->new('http://127.0.0.1:5984/testdb', 'Duncan', $term);
 $PH->run;
-cleanup();
 
 
 sub _sigHandler {
@@ -84,7 +74,6 @@ sub _sigHandler {
 	#TODO make sure this was successful
 	#TODO put some message on the LCD and keep it on..
 	$PH->destroy();
-	cleanup();
 	die "pump handler destroyed";
 }
 

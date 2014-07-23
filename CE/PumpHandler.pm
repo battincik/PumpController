@@ -131,8 +131,7 @@ sub run {
 
 			$PI->enablePumps();
 
-			$UI->message("$type selected");
-			$UI->message("Begin fueling");
+			$UI->message("$type selected", "Begin fueling");
 			# sleep(2);
 
 
