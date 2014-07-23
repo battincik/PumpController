@@ -126,7 +126,7 @@ static irqreturn_t gpio_rising_interrupt(int irq, void* dev_id) {
 			restored = 1;
 		}
 		else {
-			printk(KERN_ERR "Pump driver: wierd irq arg to the ISR");
+			printk(KERN_ERR "Pump driver: weird irq arg to the ISR");
 		}
 	}
 
