@@ -8,7 +8,9 @@ my ($opts, $term, $coldstartFlag);
 BEGIN {
 	require Getopt::Long;
 
-	print @ARGV;
+	print "$^X\n";
+	print "INC: @INC\n";
+	print "@ARGV\n";
 
 	Getopt::Long::GetOptions ("terms=s" => \$term, 
 			"coldstart" => \$coldstartFlag) 
@@ -61,6 +63,8 @@ use CE::PumpHandler;
 $SIG{INT} = \&_sigHandler;
 
 warn "terms: $term\n";
+
+# die 'about to initialize pump handler';
 
 my $PH = CE::PumpHandler->new('http://127.0.0.1:5984/testdb', 'Duncan', $term);
 $PH->run;

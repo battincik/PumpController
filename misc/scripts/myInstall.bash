@@ -121,8 +121,10 @@ fi
 #	promptUser "Continue"
 #fi
 
-echo "install daemontools for svc:"
-sudo apt-get install daemontools
+# echo "install daemontools for svc:"
+# sudo apt-get install daemontools
+echo "Installing upstart for upstart:"
+sudo apt-get install upstart
 promptUser "Continue"
 
 #This is done inside perlbrew now
