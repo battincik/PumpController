@@ -44,6 +44,7 @@ if [[ $pc ]]; then
 	echo "Success pumpcontroller"
 fi
 
+sudo apt-get update
 
 #Make this smarter. Check to see what's necessary and then do it..
 echo "Installing gcc"
@@ -78,7 +79,7 @@ echo "Installing perl-5.16.3 locally:"
 perlbrew install perl-5.16.3
 source ~/perl5/perlbrew/etc/bashrc
 perlbrew switch perl-5.16.3
-str=$(which perl | grep home | grep '5.16.3')
+str=$(which perl | grep $HOME | grep '5.16.3')
 if [[ -z "$str" ]]; then
 	echo "Perlbrew setup didn't work properly, exiting."
 	exit -1;
