@@ -21,6 +21,7 @@ sub new {
 #	$self->{couch} = couchdb('http://cowichanenergy/couchdb/testdb');
 	$self->{couch} = couchdb( $self->{db_uri} );
 	$self->{loc} = shift || 'RA';
+	$self->{ttID} = "tank_tracking:" . $self->{loc};
 
 	$self->{terms} = shift;
 	$self->{UI} = CE::UI->new( $self->{terms} );
@@ -55,11 +56,31 @@ sub run {
 		$id = join('', @resp[0..($num - 1)]);
 		my $docID = "member:$id";
 
-		my ($doc, $prices);
+		my ($doc, $prices, $tank_tracking);
+		try {
+			$tank_tracking = $couch->open_doc($self->{ttID})->recv();
+			warn "Tank tracking info acquired.";
+		}
+		catch {
+			warn "catch error message: $_.\nNo tank tracking, will continue\n";
+		};
+		goto BAIL if ( $bail == 1);
+
 		try {
 			$doc = $couch->open_doc($docID)->recv();
-			$prices = $self->_getPricePerLiter();
-			warn "prices acquired.";
+			if ( (exists $doc->{price_per_litre_diesel}) and 
+				(exists $doc->{price_per_litre_biodiesel}) ) {
+				$prices = { ppl_diesel => $doc->{price_per_litre_diesel},
+						ppl_biodiesel => $doc->{price_per_litre_biodiesel}};
+
+				warn "prices acquired.";
+			}
+			else {
+				warn "Member missing price info.";
+				$UI->message("No prices found");
+				sleep(6);
+				$bail = 1;
+			}
 		}
 		catch {		
 			#check the error message here. This could also happen due to DB connection failure..
@@ -162,10 +183,15 @@ sub run {
 					};
 			_mixToLitres($data_hash, $prices);
 
-			$ret = $self->_pushTXN($data_hash);
+			$ret = $self->_pushTXN($tank_tracking, $data_hash);
 			#TODO: this probably means something serious is wrong, not "next" probably!
 			print "_pushTXN returned $ret.\n";
-			goto BAIL if $ret;
+			if ($ret) {
+				print "$data_hash->{member_id}, $data_hash->{vol}," . 
+						" $data_hash->{total_price}, $data_hash->{product_type}" . 
+						".\n";
+				goto BAIL;
+			}
 
 			#$num = $UI->promptFeedback("Volume (e.g. 13)", \@resp, 3, 'fb');
 			#if ($num == $UI->timeoutError) {
@@ -231,6 +257,7 @@ sub destroy {
 sub _pushTXN {
 	my $self = shift;
 
+	my $tt_info = shift;
 	my $args = shift;
 
 	my $dt = DateTime->now();
@@ -261,7 +288,6 @@ sub _pushTXN {
 
 	try {
 		$self->{couch}->save_doc($txn_hash)->recv();
-		return 0;
 	}
 	catch {
 		#TODO this should obviously do something else!
@@ -276,6 +302,21 @@ sub _pushTXN {
 		}
 		return -1;
 	};
+
+	if (not defined $tt) {
+		return 0;
+	}
+	$tt->{diesel_vol} -= $args->{vol_diesel};
+	$tt->{biodiesel_vol} -= $args->{vol_biodiesel};
+	try {
+		$self->{couch}->save_doc($tt)->recv();
+	}
+	catch {
+		warn "Error updating tank tracking info $_\n." .
+				"Diesel: $tt->{diesel_vol}, and Biodiesel: $tt->{biodiesel_vol}.\n";
+	};
+
+	return 0;
 }
 
 #TODO verify the connection to the server periodically?
@@ -295,26 +336,26 @@ sub _mixToLitres {
         my $txn_hash = shift;
 	my $prices = shift;
 
-        my $vol = $txn_hash->{vol};
-        switch ( $txn_hash->{product_type} ) {
-                case 'Diesel' {
-                        $txn_hash->{vol_diesel} = $vol;
-                }
-                case 'B20' {
-                        $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.75));
-                }
-                case 'B50' {
-                        $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.5));
-                }
-                case 'B100' {
-                        $txn_hash->{vol_diesel} = '0.0';
-                }
-                else {
-                        die "Undefined product type: $txn_hash->{product_type}.";
-                }
-        }
+    my $vol = $txn_hash->{vol};
+    switch ( $txn_hash->{product_type} ) {
+            case 'Diesel' {
+                    $txn_hash->{vol_diesel} = $vol;
+            }
+            case 'B20' {
+                    $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.75));
+            }
+            case 'B50' {
+                    $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.5));
+            }
+            case 'B100' {
+                    $txn_hash->{vol_diesel} = '0.0';
+            }
+            else {
+                    die "Undefined product type: $txn_hash->{product_type}.";
+            }
+    }
 
-        $txn_hash->{vol_biodiesel} = $vol - $txn_hash->{vol_diesel};
+    $txn_hash->{vol_biodiesel} = $vol - $txn_hash->{vol_diesel};
 	$txn_hash->{ppl_diesel} = $prices->{ppl_diesel};
 	$txn_hash->{ppl_biodiesel} = $prices->{ppl_biodiesel};
 	$txn_hash->{total_price} = 
@@ -328,18 +369,6 @@ sub _mixToLitres {
 
 	$txn_hash->{total_price} = sprintf("%.2f", $txn_hash->{total_price} );
 
-}
-
-sub _getPricePerLiter {
-	my $self = shift;
-
-	my $couch = $self->{couch};
-	my $doc = $couch->open_doc("prices")->recv();
-
-	my $ret = { ppl_diesel => $doc->{price_per_litre_diesel},
-		ppl_biodiesel => $doc->{price_per_litre_biodiesel}};
-
-	return $ret;
 }
 
 1;
