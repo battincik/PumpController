@@ -179,7 +179,7 @@ promptUser "Continue"
 if [[ $pc ]]; then
 
 	sudo apt-get install python-dev
-	cpanm --skip-installed --verbose $cpanmSwitch Path::Class Parse::RecDescent Inline::Python
+	cpanm --skip-installed --verbose $cpanmSwitch Path::Class Parse::RecDescent Inline::Python YAML::XS
 	#this needs reboot
 	cp /etc/modules ./modules.tmp
 
@@ -246,7 +246,7 @@ fi
 moduleList=$(perlbrew list-modules)
 reqModules=( Math::Round Test::More YAML DateTime Try::Tiny Time::HiRes Moose methods Switch JSON::XS PadWalker Async::Interrupt CouchDB::View AnyEvent::CouchDB Data::Dumper )
 if [[ $pc ]]; then
-	reqModules+=( Parse::RecDescent Inline::Python )
+	reqModules+=( Parse::RecDescent Inline::Python YAML::XS )
 fi
 if [[ $server ]]; then
 	reqModules+=( Dancer~1.3051 Data::UUID Email::Date::Format Email::Valid LWP::Protocol::https Number::Phone URI::Query Template Digest::SHA1 Module::Refresh HTML::Strip Dancer::Plugin::Email Dancer::Plugin::Bcrypt Dancer::Plugin::Auth::RBAC Dancer::Session::Cookie Plack Starman )

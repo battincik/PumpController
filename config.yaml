@@ -1,0 +1,7 @@
+---
+db_uri: # <database url>/<database name>
+location: # location
+tunnel:
+    host: # host ip or domain name
+    user: 
+    private_key: 

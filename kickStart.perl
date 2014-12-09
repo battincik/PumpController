@@ -3,6 +3,8 @@
 use strict;
 use warnings;
 
+use YAML::XS;
+
 my ($opts, $term, $coldstartFlag);
 
 BEGIN {
@@ -16,7 +18,10 @@ BEGIN {
 			"coldstart" => \$coldstartFlag) 
 			|| die ("Bad command line arguments\n");
 
-	die("command line args missing\n") unless defined $term;
+	die("Command line args missing\n") unless defined $term;
+
+	my $config = YAML::XS::LoadFile('config.yaml');
+	die("Config file missing.") unless defined $config;
 
 	if ( defined $coldstartFlag ) {
 		print STDERR "Cold start flag used. Setting up some stuff\n";
@@ -29,10 +34,12 @@ BEGIN {
 		warn "couch is not running";
 
 		$resp = `ps aux | grep ssh`;
-		my $loc = "ssh -f -L5984:127.0.0.1:5984 -i ./bio.pem ubuntu\@ec2-54-213-146-19.us-west-2.compute.amazonaws.com -N";
+		my $loc = "ssh -f -L " . 
+					"5984:127.0.0.1:5984 -i $config->{tunnel}->{private_key} " .
+					"$config->{tunnel}->{user}\@$config->{tunnel}->{private_key} -N";
 		#my $loc = "ssh -f -L5984:127.0.0.1:5984 saamaan\@cowichanenergy -N";
 	
-		if ( $resp !~ /ssh -f -L5984:127.0.0.1:5984/ ) {
+		if ( $resp !~ /ssh -f -L 5984:127.0.0.1:5984/ ) {
 			warn "tunnelling to cowichanenergy server";
 			system($loc);
 		}
@@ -66,7 +73,7 @@ warn "terms: $term\n";
 
 # die 'about to initialize pump handler';
 
-my $PH = CE::PumpHandler->new('http://127.0.0.1:5984/testdb', 'Duncan', $term);
+my $PH = CE::PumpHandler->new($config->{db_uri}, $config->{location}, $term);
 $PH->run;
 
 
