@@ -103,6 +103,11 @@ sub run {
 				sleep(3);
 				$bail = 1;
 			}
+			if ( (not defined $doc->{payment_hash}) or ($doc->{payment_hash} == "") ) {
+				$UI->message("Payment profile", "missing");
+				sleep(3);
+				$bail = 1;
+			}
 			goto BAIL if ( $bail == 1);
 
 
