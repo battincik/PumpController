@@ -5,7 +5,7 @@ use warnings;
 
 use YAML::XS;
 
-my ($opts, $term, $coldstartFlag);
+my ($opts, $term, $coldstartFlag, $config);
 
 BEGIN {
 	require Getopt::Long;
@@ -20,7 +20,7 @@ BEGIN {
 
 	die("Command line args missing\n") unless defined $term;
 
-	my $config = YAML::XS::LoadFile('config.yaml');
+	$config = YAML::XS::LoadFile('config.yaml');
 	die("Config file missing.") unless defined $config;
 
 	if ( defined $coldstartFlag ) {
