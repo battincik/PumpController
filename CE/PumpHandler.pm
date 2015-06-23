@@ -308,17 +308,17 @@ sub _pushTXN {
 		return -1;
 	};
 
-	if (not defined $tt) {
+	if (not defined $tt_info) {
 		return 0;
 	}
-	$tt->{diesel_vol} -= $args->{vol_diesel};
-	$tt->{biodiesel_vol} -= $args->{vol_biodiesel};
+	$tt_info->{diesel_vol} -= $args->{vol_diesel};
+	$tt_info->{biodiesel_vol} -= $args->{vol_biodiesel};
 	try {
-		$self->{couch}->save_doc($tt)->recv();
+		$self->{couch}->save_doc($tt_info)->recv();
 	}
 	catch {
 		warn "Error updating tank tracking info $_\n." .
-				"Diesel: $tt->{diesel_vol}, and Biodiesel: $tt->{biodiesel_vol}.\n";
+				"Diesel: $tt_info->{diesel_vol}, and Biodiesel: $tt_info->{biodiesel_vol}.\n";
 	};
 
 	return 0;
