@@ -308,7 +308,7 @@ static int fops_mmap(struct file *filp, struct vm_area_struct *vma)
 	//printk("Pump driver: fops_mmap called\n");
 
 	vma->vm_ops = &mmap_vm_ops;
-	vma->vm_flags |= VM_RESERVED;
+	vma->vm_flags |= (VM_DONTEXPAND | VM_DONTDUMP);
 	// assign the file private data to the vm private data
 	vma->vm_private_data = filp->private_data;
 
