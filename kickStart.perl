@@ -34,9 +34,9 @@ BEGIN {
 		warn "couch is not running";
 
 		$resp = `ps aux | grep ssh`;
-		my $loc = "ssh -f -L " . 
-					"5984:127.0.0.1:5984 -i $config->{tunnel}->{private_key} " .
-					"$config->{tunnel}->{user}\@$config->{tunnel}->{private_key} -N";
+		my $loc = "ssh -f -L ".
+			"5984:127.0.0.1:5984 -i $config->{tunnel}->{private_key} ".
+			"$config->{tunnel}->{user}\@$config->{tunnel}->{host} -N";
 		#my $loc = "ssh -f -L5984:127.0.0.1:5984 saamaan\@cowichanenergy -N";
 	
 		if ( $resp !~ /ssh -f -L 5984:127.0.0.1:5984/ ) {
