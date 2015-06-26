@@ -36,3 +36,11 @@ keypad
 Usb encoder board connects to the keypad with a ribbon cable.
 I marked the header on the board with red ink. The red stripe goes on that side.
 There is a usb cable to connect the encoder board to the pi.
+
+How to enable i2c on Pi2
+-----------------------------
+It is possible to do this using Raspi-Config. To do it manually,
+-make sure i2c-bcm2708 and i2c-dev are added to /etc/modules
+-make sure i2c entries /etc/modprobe.d/raspi-blacklist.conf are commented out
+-make sure dtparam=i2c1=on and dtparam=i2c_arm=on are added to /boot/config.txt
+(in the newer versions, i2c1 is available instead of i2c0..)
