@@ -53,6 +53,8 @@ sub run {
 		}
 		goto BAIL if ( $bail == 1);
 
+		$UI->message("Please wait..");
+
 		$id = join('', @resp[0..($num - 1)]);
 		my $docID = "member:$id";
 
