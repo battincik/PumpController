@@ -73,7 +73,8 @@ warn "terms: $term\n";
 
 # die 'about to initialize pump handler';
 
-my $PH = CE::PumpHandler->new($config->{db_uri}, $config->{location}, $term);
+my $PH = CE::PumpHandler->new($config->{db_uri}, $config->{location},
+				$config->{tax_area}, $term);
 $PH->run;
 
 

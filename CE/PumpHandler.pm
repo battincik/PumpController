@@ -21,6 +21,7 @@ sub new {
 #	$self->{couch} = couchdb('http://cowichanenergy/couchdb/testdb');
 	$self->{couch} = couchdb( $self->{db_uri} );
 	$self->{loc} = shift || 'RA';
+	$self->{tax_area} = shift || 'BC';
 	$self->{ttID} = "tank_tracking:" . $self->{loc};
 
 	$self->{terms} = shift;
@@ -286,7 +287,7 @@ sub _pushTXN {
 		#price_per_litre => $args->{priceFromDispsr},
 		price => $args->{total_price},
 		paid => 0,
-		tax_area => 'Victoria',
+		tax_area => $self->{tax_area},
 		pump => $self->{loc}
 	};
 

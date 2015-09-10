@@ -5,3 +5,4 @@ tunnel:
     host: # host ip or domain name
     user: 
     private_key: 
+tax_area: # Victoria, Vancouver, or BC (for the rest of BC)
