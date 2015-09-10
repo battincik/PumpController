@@ -350,7 +350,7 @@ sub _mixToLitres {
                     $txn_hash->{vol_diesel} = $vol;
             }
             case 'B20' {
-                    $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.75));
+                    $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.8));
             }
             case 'B50' {
                     $txn_hash->{vol_diesel} = sprintf('%0.03f', ($vol * 0.5));
