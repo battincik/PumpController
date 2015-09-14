@@ -45,6 +45,8 @@ sub run {
 	my ($id, $p, $num, $vol, $bail); $bail = 0;
 
 	while ( $self->_idle() ) {
+		my $currentDate = localtime();
+		warn $currentDate, "\n";
 
 		$num = $UI->promptFeedback("User ID + Enter", \@resp, 7, 'fb');
 		if ($num == $UI->timeoutError) {
@@ -291,8 +293,8 @@ sub _pushTXN {
 		pump => $self->{loc}
 	};
 
-	#my $str = Dumper($txn_hash);
-	#warn "txn hash: $str";
+	my $str = Dumper($txn_hash);
+	warn "txn hash: $str";
 
 	try {
 		$self->{couch}->save_doc($txn_hash)->recv();
