@@ -7,7 +7,8 @@ use CE::UI;
 use CE::PumpInterface;
 
 use AnyEvent::CouchDB;
-use Try::Tiny;
+# use Try::Tiny;
+use Try::Tiny::Retry;
 use DateTime;
 use Switch;
 
@@ -195,9 +196,9 @@ sub run {
 
 			$ret = $self->_pushTXN($tank_tracking, $data_hash);
 			#TODO: this probably means something serious is wrong, not "next" probably!
-			print "_pushTXN returned $ret.\n";
+			warn "_pushTXN returned $ret.\n";
 			if ($ret) {
-				print "$data_hash->{member_id}, $data_hash->{vol}," . 
+				warn "$data_hash->{member_id}, $data_hash->{vol}," .
 						" $data_hash->{total_price}, $data_hash->{product_type}" . 
 						".\n";
 				goto BAIL;
@@ -233,7 +234,7 @@ sub run {
 	$PI->destroy();
 	$UI->destroyUI();
 
-	print "UI destroyed normally\n";
+	warn "UI destroyed normally\n";
 
 	#for (my $i = 0; $i < 10; $i++) {
 	#	$PI->enablePump();
@@ -296,9 +297,15 @@ sub _pushTXN {
 	my $str = Dumper($txn_hash);
 	warn "txn hash: $str";
 
-	try {
+	retry {
 		$self->{couch}->save_doc($txn_hash)->recv();
 	}
+	retry_if { not /^404 - / }
+	on_retry {
+		warn "Error: $_, Retrying...\n";
+		$self->{UI}->message("No DB connection", "Retrying...");
+	}
+	delay_exp { 4, 1e6 }
 	catch {
 		#TODO this should obviously do something else!
 		#check the error message here. This could also happen due to DB connection failure..
@@ -318,9 +325,15 @@ sub _pushTXN {
 	}
 	$tt_info->{diesel_vol} -= $args->{vol_diesel};
 	$tt_info->{biodiesel_vol} -= $args->{vol_biodiesel};
-	try {
+	retry {
 		$self->{couch}->save_doc($tt_info)->recv();
 	}
+	retry_if { not /^404 - / }
+	on_retry {
+		warn "Error: $_, Retrying...\n";
+		$self->{UI}->message("No DB connection", "Retrying...");
+	}
+	delay_exp { 4, 1e6 }
 	catch {
 		warn "Error updating tank tracking info $_\n." .
 				"Diesel: $tt_info->{diesel_vol}, and Biodiesel: $tt_info->{biodiesel_vol}.\n";
@@ -372,10 +385,10 @@ sub _mixToLitres {
 		( $txn_hash->{vol_biodiesel} * $txn_hash->{ppl_biodiesel}) +
 		($txn_hash->{vol_diesel} * $txn_hash->{ppl_diesel});
 
-	print "Mix: $txn_hash->{product_type}.\n";
-	print "ppl_d: $txn_hash->{ppl_diesel}, ppl_bd: $txn_hash->{ppl_biodiesel}.\n";
-	print "vol_d: $txn_hash->{vol_diesel}, vol_bd: $txn_hash->{vol_biodiesel}.\n";
-	print "total: $txn_hash->{total_price}.\n";
+	# print "Mix: $txn_hash->{product_type}.\n";
+	# print "ppl_d: $txn_hash->{ppl_diesel}, ppl_bd: $txn_hash->{ppl_biodiesel}.\n";
+	# print "vol_d: $txn_hash->{vol_diesel}, vol_bd: $txn_hash->{vol_biodiesel}.\n";
+	# print "total: $txn_hash->{total_price}.\n";
 
 	$txn_hash->{total_price} = sprintf("%.2f", $txn_hash->{total_price} );
 
