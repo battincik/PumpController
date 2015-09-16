@@ -134,7 +134,7 @@ promptUser "Continue"
 #promptUser "Continue"
 
 echo "Installing required perl modules using CPANM -- these really should just go, seriously:|"
-cpanm --skip-installed --verbose $cpanmSwitch Math::Round Test::More YAML DateTime Try::Tiny Time::HiRes Moose methods Curses #Device::SerialPort Control::CLI
+cpanm --skip-installed --verbose $cpanmSwitch Math::Round Test::More YAML DateTime Try::Tiny Try::Tiny::Retry Time::HiRes Moose methods Curses #Device::SerialPort Control::CLI
 if [[ $server ]]; then
 	cpanm --skip-installed --verbose $cpanmSwitch Dancer~1.3051 Data::UUID Email::Date::Format Email::Valid LWP::Protocol::https Number::Phone URI::Query Template Digest::SHA1 Module::Refresh HTML::Strip
 	promptUser "Continue"
@@ -244,7 +244,7 @@ fi
 
 #Make sure all perl modules are installed properly 
 moduleList=$(perlbrew list-modules)
-reqModules=( Math::Round Test::More YAML DateTime Try::Tiny Time::HiRes Moose methods Switch JSON::XS PadWalker Async::Interrupt CouchDB::View AnyEvent::CouchDB Data::Dumper )
+reqModules=( Math::Round Test::More YAML DateTime Try::Tiny Try::Tiny::Retry Time::HiRes Moose methods Switch JSON::XS PadWalker Async::Interrupt CouchDB::View AnyEvent::CouchDB Data::Dumper )
 if [[ $pc ]]; then
 	reqModules+=( Parse::RecDescent Inline::Python YAML::XS )
 fi
